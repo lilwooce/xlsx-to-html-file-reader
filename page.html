@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>xlsx to html</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+
+<body>
+    <p>Click on the "Choose File" button to upload an xlsx file that will be converted</p>
+    <div id="wrapper">
+        <input type="file" id="input-excel"/>
+    </div>
+
+    <script>
+        $('#input-excel').change(function(e){
+            var reader = new FileReader();
+            reader.readAsArrayBuffer(e.target.files[0]);
+
+            reader.onload = function(e) {
+                var data = new Uint8Array(reader.result);
+                var wb = XLSX.read(data, {type: 'array'});
+
+                var htmlstr = XLSX.write(wb, {sheet: "Card Data",type: 'binary',bookType: 'html'});
+                $('#wrapper')[0].innerHTML += htmlstr;
+            }
+        });
+    </script>
+
+</body>
+
+</html>
+
