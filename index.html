@@ -17,6 +17,7 @@
         <p>After loading your file, choose a filter here</p>
         <button onclick="openDrop()" class="dropbtn">Filters</button>
         <button onclick="reloadTable()" >Clear Filters</button>
+        <div id="container"></div>
         <div id="myDropdown" class="dropdown-content">
                 
         </div>
@@ -27,9 +28,10 @@
     </div>
 
     <button onclick="exportTable()" id="export-btn">Export as XLSX</button>
+        
     <script>
         function loadDropdown(workbook) {
-            console.log("loading dropdown menu");
+            let filters = ["faction", "cardClass", "rarity", "baseVal", "attrib1Val", "attrib2Val", "fullVal"]
             var sheet = workbook.Sheets[workbook.SheetNames[0]];
             var range = XLSX.utils.decode_range(sheet['!ref']); // get the range
             for (let C = 0; C<= range.e.c; ++C) {
@@ -37,7 +39,6 @@
                 let cell_ref = XLSX.utils.encode_cell(cell_address);
                 if (!sheet[cell_ref]) continue;
                 let cell = sheet[cell_ref];
-                let filters = ["faction", "cardClass", "rarity"]
 
                 for (let i=0; i<filters.length; i++) {
                     if (cell.v === filters[i]) {
@@ -58,33 +59,36 @@
                         dropU.appendChild(dropL);
                         dropL.appendChild(aDrop);
 
-                        let filterSheet = workbook.Sheets[filters[i]];
-                        let subRange = XLSX.utils.decode_range(filterSheet['!ref']);
+                        if (workbook.Sheets[filters[i]]) {
+                            let filterSheet = workbook.Sheets[filters[i]];
+                            let subRange = XLSX.utils.decode_range(filterSheet['!ref']);
 
-                        for (let R = 1; R<= subRange.e.r; ++R) {
-                            let cellA = {c:0, r:R};
-                            let cellR = XLSX.utils.encode_cell(cellA);
-                            if(!filterSheet[cellR]) continue;
-                            let c = filterSheet[cellR];
+                            for (let R = 1; R<= subRange.e.r; ++R) {
+                                let cellA = {c:0, r:R};
+                                let cellR = XLSX.utils.encode_cell(cellA);
+                                if(!filterSheet[cellR]) continue;
+                                let c = filterSheet[cellR];
 
-                            let dropUl = document.createElement("ul");
-                            let dropLi = document.createElement("li");
-                            let subDrop = document.createElement("a");
-                            
-                            subDrop.setAttribute('href', "#");
-                            subDrop.tabIndex = "-1";
-                            subDrop.innerText = c.v;
-                            subDrop.onclick = function() { filterTable(filters[i], subDrop.innerText, workbook, sheet); };
-                            dropUl.className = "dropMenu";
+                                let dropUl = document.createElement("ul");
+                                let dropLi = document.createElement("li");
+                                let subDrop = document.createElement("a");
+                                
+                                subDrop.setAttribute('href', "#");
+                                subDrop.tabIndex = "-1";
+                                subDrop.innerText = c.v;
+                                subDrop.onclick = function() { filterTable(filters[i], subDrop.innerText, workbook, sheet); };
+                                dropUl.className = "dropMenu";
 
-                            dropL.appendChild(dropUl);
-                            dropUl.appendChild(dropLi);
-                            dropLi.appendChild(subDrop);
+                                dropL.appendChild(dropUl);
+                                dropUl.appendChild(dropLi);
+                                dropLi.appendChild(subDrop);
+                            }
+                        } else {
+                            aDrop.onclick = function() { createNumFilter(filters[i], workbook, sheet); };
                         }
                     }
                 }
             }
-            console.log("filter dropdown menu loaded")
         }
 
         function openDrop() {
@@ -105,7 +109,35 @@
             }
         }
 
-        function filterTable(category, filter, wb, sheet, filter2) {
+        function createNumFilter(filter, workbook, sheet) {
+            let minInput = document.createElement("input");
+            let maxInput = document.createElement("input");
+            let submitInput = document.createElement("input");
+            let para = document.createElement("p");
+            let container = document.getElementById("container");
+
+            minInput.type = "number";
+            minInput.id = "minInput";
+            minInput.min = 0;
+            minInput.max = 500;
+
+            maxInput.type = "number";
+            maxInput.id = "maxInput";
+            maxInput.min = 0;
+            maxInput.max = 500;
+
+            para.innerText = "Insert your minimum and maximum values in the following boxes."
+
+            submitInput.type = "submit";
+            submitInput.onclick = function() {filterTable(filter, 1, workbook, sheet, $("#minInput").val(), $("#maxInput").val());}
+
+            container.appendChild(para);
+            container.appendChild(minInput);
+            container.appendChild(maxInput);
+            container.appendChild(submitInput);
+        }
+
+        function filterTable(category, filter, wb, sheet, numMin=0, numMax=0) {
             let rows = [];
             let column = 0;
 
@@ -129,17 +161,16 @@
                 if (!sheet[cell_ref]) continue;
                 let cell = sheet[cell_ref];
 
-                if (cell.t != "n") {
+                if (typeof filter === typeof "string") {
                     if (cell.v === filter) {
                         rows.push(R);
                     }
                 } else {
-                    if (filter2) {
-
+                    if (cell.v >= numMin && cell.v <= numMax) {
+                        rows.push(R);
                     }
                 }
             }
-
             //now create the table
             createTable(wb, sheet, rows);
         }
@@ -147,6 +178,7 @@
         function createTable(wb, sheet, rows) {
             //clear the table first
             $("#wrapper")[0].innerHTML = "";
+            $("#container")[0].innerHTML = "";
 
             //start by creating the header row
             let divMain = document.getElementById("wrapper");
@@ -224,6 +256,7 @@
                     var sheet1 = wb.Sheets[wb.SheetNames[0]].name;
                     var htmlstr = XLSX.write(wb, {sheet: sheet1, type: 'binary',bookType: 'html'});
                     $('#wrapper')[0].innerHTML = "";
+                    $("#container")[0].innerHTML = "";
                     $('#wrapper')[0].innerHTML += htmlstr;
                 }
             }
