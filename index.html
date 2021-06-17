@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>xlsx to html</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script lang="javascript" src="FileSaver.js"></script>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+
+<body>
+    <p>Click on the "Choose File" button to upload an xlsx file that will be converted</p>
+    <div>
+        <input type="file" id="input-excel"/>
+        <br>
+        <p>After loading your file, choose a filter here</p>
+        <button onclick="openDrop()" class="dropbtn">Filters</button>
+        <button onclick="reloadTable()" >Clear Filters</button>
+        <div id="myDropdown" class="dropdown-content">
+                
+        </div>
+    </div>
+
+    <div id="wrapper">
+        
+    </div>
+
+    <button onclick="exportTable()" id="export-btn">Export as XLSX</button>
+    <script>
+        function loadDropdown(workbook) {
+            console.log("loading dropdown menu");
+            var sheet = workbook.Sheets[workbook.SheetNames[0]];
+            var range = XLSX.utils.decode_range(sheet['!ref']); // get the range
+            for (let C = 0; C<= range.e.c; ++C) {
+                let cell_address = {c:C, r:0};
+                let cell_ref = XLSX.utils.encode_cell(cell_address);
+                if (!sheet[cell_ref]) continue;
+                let cell = sheet[cell_ref];
+                let filters = ["faction", "cardClass", "rarity"]
+
+                for (let i=0; i<filters.length; i++) {
+                    if (cell.v === filters[i]) {
+                        let dropDiv = document.getElementById("myDropdown");
+                        let dropL = document.createElement("li");
+                        let aDrop = document.createElement("a");
+                        let dropU = document.createElement("ul");
+
+                        aDrop.setAttribute('href', "#");
+                        aDrop.className = "subDrop";
+                        aDrop.tabIndex = "-1";
+                        aDrop.id = filters[i];
+                        aDrop.innerText = cell.v;
+                        dropL.className = "dropSubMenu";
+                        dropU.className = "dropMenu";
+
+                        dropDiv.appendChild(dropU);
+                        dropU.appendChild(dropL);
+                        dropL.appendChild(aDrop);
+
+                        let filterSheet = workbook.Sheets[filters[i]];
+                        let subRange = XLSX.utils.decode_range(filterSheet['!ref']);
+
+                        for (let R = 1; R<= subRange.e.r; ++R) {
+                            let cellA = {c:0, r:R};
+                            let cellR = XLSX.utils.encode_cell(cellA);
+                            if(!filterSheet[cellR]) continue;
+                            let c = filterSheet[cellR];
+
+                            let dropUl = document.createElement("ul");
+                            let dropLi = document.createElement("li");
+                            let subDrop = document.createElement("a");
+                            
+                            subDrop.setAttribute('href', "#");
+                            subDrop.tabIndex = "-1";
+                            subDrop.innerText = c.v;
+                            subDrop.onclick = function() { filterTable(filters[i], subDrop.innerText, workbook, sheet); };
+                            dropUl.className = "dropMenu";
+
+                            dropL.appendChild(dropUl);
+                            dropUl.appendChild(dropLi);
+                            dropLi.appendChild(subDrop);
+                        }
+                    }
+                }
+            }
+            console.log("filter dropdown menu loaded")
+        }
+
+        function openDrop() {
+            document.getElementById("myDropdown").classList.toggle("show");
+        }
+
+        //close dropdown when user clicks outside of it
+        window.onclick = function(event) {
+            if (!event.target.matches('.dropbtn')) {
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                var i;
+                for (i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+
+        function filterTable(category, filter, wb, sheet, filter2) {
+            let rows = [];
+            let column = 0;
+
+            //check headers to find what column to filter by
+            var range = XLSX.utils.decode_range(sheet['!ref']);
+            for (let C=0; C <= range.e.c; C++) {
+                let cell_address = {c:C, r:0};
+                let cell_ref = XLSX.utils.encode_cell(cell_address);
+                if (!sheet[cell_ref]) continue;
+                let cell = sheet[cell_ref];
+
+                if (cell.v === category) {
+                    column = C;
+                }
+            }
+
+            //after finding the column, loop through every row in the array except the headers to find which fit the criteria
+            for (let R=1; R <= range.e.r; R++) {
+                let cell_address = {c:column, r:R};
+                let cell_ref = XLSX.utils.encode_cell(cell_address);
+                if (!sheet[cell_ref]) continue;
+                let cell = sheet[cell_ref];
+
+                if (cell.t != "n") {
+                    if (cell.v === filter) {
+                        rows.push(R);
+                    }
+                } else {
+                    if (filter2) {
+
+                    }
+                }
+            }
+
+            //now create the table
+            createTable(wb, sheet, rows);
+        }
+
+        function createTable(wb, sheet, rows) {
+            //clear the table first
+            $("#wrapper")[0].innerHTML = "";
+
+            //start by creating the header row
+            let divMain = document.getElementById("wrapper");
+            let tableMain = document.createElement("table");
+            let tableBody = document.createElement("tbody");
+            let headerRow = document.createElement("tr");
+
+            tableMain.id = "xlsxTable";
+
+            divMain.appendChild(tableMain);
+            tableMain.appendChild(tableBody);
+            tableBody.appendChild(headerRow);
+
+            var range = XLSX.utils.decode_range(sheet['!ref']);
+            for (let C=0; C <= range.e.c; C++) {
+                let cell_address = {c:C, r:0};
+                let cell_ref = XLSX.utils.encode_cell(cell_address);
+                if (!sheet[cell_ref]) continue;
+                let cell = sheet[cell_ref];
+
+                let tableHead = document.createElement("th");
+                tableHead.v = cell.v;
+                tableHead.innerText = cell.v;
+
+                headerRow.appendChild(tableHead);
+            }
+
+            //now start creating the body rows
+            for (let i=0; i<rows.length; i++) {
+                let tabRow = document.createElement("tr");
+                tableBody.appendChild(tabRow);
+                for (let C=0; C<=range.e.c; C++) {
+                    let tabData = document.createElement("td");
+                    
+                    let cell_address = {c:C, r:rows[i]};
+                    let cell_ref = XLSX.utils.encode_cell(cell_address);
+                    let cell = sheet[cell_ref];
+
+                    if (cell === undefined) {
+                        tabData.innerHTML = "";
+                    } else {
+                        tabData.innerHTML = cell.v;
+                    }
+                    tabData.id = "sjs-" + cell_ref;
+                    tabRow.appendChild(tabData);
+                }
+            }
+        }
+        
+        $('#input-excel').change(function(e){
+            var reader = new FileReader();
+            reader.readAsArrayBuffer(e.target.files[0]);
+
+            reader.onload = function(e) {
+                var data = new Uint8Array(reader.result);
+                var wb = XLSX.read(data, {type: 'array'});
+                var sheet1 = wb.Sheets[wb.SheetNames[0]].name;
+                var htmlstr = XLSX.write(wb, {sheet: sheet1, type: 'binary',bookType: 'html'});
+                $('#wrapper')[0].innerHTML += htmlstr;
+                loadDropdown(wb);
+            }
+        });
+
+        function reloadTable() {
+            let fileInput = document.getElementById("input-excel");
+            let xlsxFile = fileInput.files[0];
+
+            if (xlsxFile) {
+                var reader = new FileReader();
+                reader.readAsArrayBuffer(xlsxFile);
+
+                reader.onload = function(e) {
+                    var data = new Uint8Array(reader.result);
+                    var wb = XLSX.read(data, {type: 'array'});
+                    var sheet1 = wb.Sheets[wb.SheetNames[0]].name;
+                    var htmlstr = XLSX.write(wb, {sheet: sheet1, type: 'binary',bookType: 'html'});
+                    $('#wrapper')[0].innerHTML = "";
+                    $('#wrapper')[0].innerHTML += htmlstr;
+                }
+            }
+        }
+
+
+        
+
+        function s2ab(s) {
+            var buf = new ArrayBuffer(s.length);
+            var view = new Uint8Array(buf);
+            for (var i=0; i<s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+            return buf;
+        }
+
+        function exportTable() {
+            let workbook = XLSX.utils.table_to_book(document.getElementById("xlsxTable"), {sheet: "Sheet JS"});
+            let wbout = XLSX.write(workbook, {bookType:'xlsx', bookSST:true, type: 'binary'});
+            saveAs(new Blob([s2ab(wbout)],{type:"application/octet-stream"}), 'test.xlsx');
+        }
+    </script>
+
+</body>
+
+</html>
+
